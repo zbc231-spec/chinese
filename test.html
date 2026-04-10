@@ -267,7 +267,7 @@
 
         function clearCanvas() { drawGrids(currentItem.w); }
 
-      async function submitWriting() {
+     async function submitWriting() {
     if (!apiKey) {
         alert("請先填寫 API Key！");
         return;
@@ -285,8 +285,8 @@
     請務必回傳純 JSON 格式：{"correct": true, "msg": "回饋內容"}`;
 
     try {
-        // 使用目前最穩定的 1.5-flash 模型與 v1beta 路徑
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        // 改用 v1 正式版路徑
+        const url = https://www.google.com/search?q=https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent%3Fkey%3D${apiKey};
         
         const response = await fetch(url, {
             method: 'POST',
@@ -297,12 +297,14 @@
             })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error ? errorData.error.message : "連線失敗");
+        const data = await response.json();
+
+        // 檢查 API 是否報錯
+        if (data.error) {
+            throw new Error(data.error.message);
         }
         
-        const data = await response.json();
+        // 解析 AI 回傳的 JSON 字串
         const res = JSON.parse(data.candidates[0].content.parts[0].text);
         
         if (res.correct) {
@@ -325,7 +327,7 @@
         document.getElementById('loading-overlay').classList.add('hidden');
         document.getElementById('result-modal').classList.remove('hidden');
     } catch (e) {
-        // 這裡會告訴你具體是什麼報錯，例如 API Key 無效或模型找不到
+        // 顯示具體錯誤，如果是 API Key 問題也會顯示在此
         alert("批改發生錯誤：" + e.message);
         document.getElementById('loading-overlay').classList.add('hidden');
     }
