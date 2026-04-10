@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI 聽寫精熟大師 - 穩定版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        body { margin: 0; overflow: hidden; touch-action: none; background-color: #f1f5f9; font-family: sans-serif; }
+        canvas { cursor: crosshair; touch-action: none; background-color: white; border-radius: 16px; }
+        .no-select { user-select: none; -webkit-user-select: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const App = () => {
+            // --- 圈詞資料庫 ---
+            const vocabData = {
+                1: [{w:"音符",b:"ㄧㄣ ㄈㄨˊ"},{w:"坎坷",b:"ㄎㄢˇ ㄎㄜˇ"},{w:"澎湃",b:"ㄆㄥ ㄆㄞˋ"},{w:"無垠",b:"ㄨˊ ㄧㄣˊ"},{w:"丘陵",b:"ㄑㄧㄡ ㄌㄧㄥˊ"},{w:"瞭望",b:"ㄌㄧㄠˋ ㄨㄤˋ"},{w:"碧波",b:"ㄅㄧˋ ㄅㄛ"},{w:"盪漾",b:"協助"}],
+                2: [{w:"山巒",b:"ㄕㄢ ㄌㄨㄢˊ"},{w:"隧道",b:"ㄙㄨㄟˋ ㄉㄠˋ"},{w:"綻放",b:"ㄓㄢˋ ㄈㄤˋ"},{w:"震動",b:"ㄓㄣˋ ㄉㄨㄥˋ"},{w:"顫抖",b:"ㄓㄣˋ ㄉㄡˇ"},{w:"覆蓋",b:"ㄈㄨˋ ㄍㄞˋ"},{w:"低吟",b:"ㄉㄧ ㄧㄣˊ"}],
+                3: [{w:"寺廟",b:"ㄙˋ ㄇㄧㄠˋ"},{w:"點綴",b:"ㄉㄧㄢˇ ㄓㄨㄟˋ"},{w:"杜鵑",b:"杜 ㄐㄩㄢ"},{w:"宇宙",b:"ㄩˇ ㄓㄡˋ"},{w:"屬於",b:"ㄕㄨˇ ㄩˊ"},{w:"返璞歸真",b:"ㄈㄢˇ ㄆㄨˊ ㄍㄨㄟ ㄓㄣ"}],
+                4: [{w:"和藹",b:"ㄏㄜˊ ㄞˇ"},{w:"震撼",b:"ㄓㄣˋ ㄏㄢˋ"},{w:"尷尬",b:"ㄍㄢ ㄍㄚˋ"},{w:"恢復",b:"ㄏㄨㄟ ㄈㄨˋ"},{w:"奉獻",b:"ㄈㄥˋ ㄒㄧㄢˋ"}],
+                5: [{w:"囑咐",b:"ㄓㄨˇ ㄈㄨˋ"},{w:"富裕",b:"ㄈㄨˋ ㄩˋ"},{w:"領悟",b:"ㄌㄧㄥˇ ㄨˋ"},{w:"演講",b:"ㄧㄢˇ ㄐㄧㄤˇ"},{w:"障礙",b:"ㄓㄤˋ ㄞˋ"}],
+                6: [{w:"瀰漫",b:"ㄇㄧˊ ㄇㄢˋ"},{w:"暫時",b:"ㄗㄢˋ ㄕˊ"},{w:"煞有介事",b:"ㄕㄚˋ ㄧㄡˇ ㄐㄧㄝˋ ㄕˋ"},{w:"不置可否",b:"ㄅㄨˋ ㄓˋ ㄎㄜˇ ㄈㄡˇ"},{w:"聯絡簿",b:"ㄌㄧㄢˊ ㄌㄨㄛˋ ㄅㄨˋ"}]
+            };
+
+            const [screen, setScreen] = useState('menu');
+            const [totalScore, setTotalScore] = useState(0);
+            const [sessionScore, setSessionScore] = useState(0);
+            const [activeItem, setActiveItem] = useState(null);
+            const [queue, setQueue] = useState([]);
+            const [retryQueue, setRetryQueue] = useState([]);
+            const [lessonTitle, setLessonTitle] = useState('');
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [feedback, setFeedback] = useState(null);
+
+            const canvasRef = useRef(null);
+            const strokesRef = useRef([]);
+            const isDrawing = useRef(false);
+            const currentPath = useRef([]);
+
+            // 尺寸設計：國字正方形，注音寬度增加
+            const CHAR_SIZE = 220; 
+            const BPO_WIDTH = 180; 
+            const BOX_GAP = 30;
+
+            useEffect(() => {
+                if (screen === 'quiz' && activeItem) {
+                    const timer = setTimeout(() => { setupCanvas(); }, 200);
+                    return () => clearTimeout(timer);
+                }
+            }, [activeItem, screen]);
+
+            const startLesson = (lessonKey) => {
+                let pool = lessonKey === 'all' ? Object.values(vocabData).flat() : [...vocabData[lessonKey]];
+                const shuffled = pool.sort(() => Math.random() - 0.5);
+                setQueue(shuffled);
+                setRetryQueue([]);
+                setSessionScore(0);
+                setLessonTitle(lessonKey === 'all' ? "全範圍隨機測試" : `第 ${lessonKey} 課練習`);
+                setScreen('quiz');
+                loadWord(shuffled, []);
+            };
+
+            const loadWord = (q, r) => {
+                let next = null;
+                let nQ = [...q], nR = [...r];
+                if (nQ.length > 0) {
+                    next = nQ.shift();
+                } else if (nR.length > 0) {
+                    nQ = [...nR].sort(() => Math.random() - 0.5);
+                    nR = [];
+                    next = nQ.shift();
+                    setFeedback({ correct: false, msg: "準備進入複習階段囉！" });
+                } else {
+                    setScreen('lessonComplete');
+                    return;
+                }
+                setQueue(nQ); setRetryQueue(nR);
+                setActiveItem(next); setFeedback(null);
+                strokesRef.current = [];
+                speak(next.w);
+            };
+
+            const speak = (text) => {
+                if (!text) return;
+                window.speechSynthesis.cancel();
+                const msg = new SpeechSynthesisUtterance(`請寫出：${text}`);
+                msg.lang = 'zh-TW';
+                msg.rate = 0.8;
+                window.speechSynthesis.speak(msg);
+            };
+
+            const setupCanvas = () => {
+                const canvas = canvasRef.current;
+                if (!canvas || !activeItem) return;
+                const ctx = canvas.getContext('2d');
+                const totalWidth = 20 + CHAR_SIZE + 20 + BPO_WIDTH + 20;
+                const charLen = activeItem.w.length;
+                const totalHeight = (CHAR_SIZE + BOX_GAP) * charLen + BOX_GAP;
+                
+                canvas.width = totalWidth * 2;
+                canvas.height = totalHeight * 2;
+                canvas.style.width = `${totalWidth}px`;
+                canvas.style.height = `${totalHeight}px`;
+                ctx.scale(2, 2);
+                drawUI(ctx, totalWidth, charLen);
+            };
+
+            const drawUI = (ctx, width, charLen) => {
+                ctx.clearRect(0, 0, width, 5000);
+                for (let i = 0; i < charLen; i++) {
+                    const y = BOX_GAP + i * (CHAR_SIZE + BOX_GAP);
+                    const bpoX = 20 + CHAR_SIZE + 20;
+
+                    ctx.strokeStyle = "#fca5a5"; ctx.lineWidth = 2;
+                    ctx.strokeRect(20, y, CHAR_SIZE, CHAR_SIZE);
+                    ctx.setLineDash([5, 5]);
+                    ctx.beginPath();
+                    ctx.moveTo(20 + CHAR_SIZE/2, y); ctx.lineTo(20 + CHAR_SIZE/2, y + CHAR_SIZE);
+                    ctx.moveTo(20, y + CHAR_SIZE/2); ctx.lineTo(20 + CHAR_SIZE, y + CHAR_SIZE/2);
+                    ctx.stroke(); ctx.setLineDash([]);
+
+                    ctx.strokeStyle = "#93c5fd";
+                    ctx.strokeRect(bpoX, y, BPO_WIDTH, CHAR_SIZE);
+                    ctx.fillStyle = "#94a3b8";
+                    ctx.font = "bold 14px sans-serif";
+                    ctx.fillText(`國字 ${i+1}`, 20, y - 10);
+                    ctx.fillText(`注音區`, bpoX, y - 10);
+                }
+                ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 6;
+                strokesRef.current.forEach(path => {
+                    if (path.length < 1) return;
+                    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
+                    path.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
+                });
+            };
+
+            const handlePointer = (e, type) => {
+                const canvas = canvasRef.current; if (!canvas) return;
+                const rect = canvas.getBoundingClientRect();
+                const touch = e.touches ? e.touches[0] : e;
+                const x = touch.clientX - rect.left;
+                const y = touch.clientY - rect.top;
+
+                if (type === 'start') {
+                    isDrawing.current = true;
+                    currentPath.current = [{ x, y }];
+                } else if (type === 'move' && isDrawing.current) {
+                    if (e.cancelable) e.preventDefault();
+                    currentPath.current.push({ x, y });
+                    const ctx = canvas.getContext('2d');
+                    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 6;
+                    ctx.beginPath();
+                    const last = currentPath.current[currentPath.current.length - 2];
+                    ctx.moveTo(last.x, last.y); ctx.lineTo(x, y); ctx.stroke();
+                } else if (type === 'end') {
+                    if (isDrawing.current) strokesRef.current.push([...currentPath.current]);
+                    isDrawing.current = false;
+                }
+            };
+
+            const submit = async () => {
+                if (strokesRef.current.length < 2) return;
+                setIsAnalyzing(true);
+                const imgData = canvasRef.current.toDataURL('image/png').split(',')[1];
+                const prompt = `這是一個國小聽寫測驗。題目是「${activeItem.w}」，注音是「${activeItem.b}」。請檢查圖片中正方形內的國字與長方形內的注音。請嚴格批改，務必回傳純 JSON 格式：{"correct": true, "msg": "回饋一句話"}`;
+
+                // --- ⚠️ 在此輸入您的 API KEY ---
+                const API_KEY = "AIzaSyApo0XAX223pk2P0AfZYrgrOvu2PK1JQP4";
+
+                try {
+                    const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: imgData } }]
+                            }]
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (data.error) throw new Error(data.error.message);
+
+                    const rawText = data.candidates[0].content.parts[0].text;
+                    const cleanJson = rawText.replace(/```json|```/g, "").trim();
+                    const result = JSON.parse(cleanJson);
+
+                    setFeedback(result);
+                    if (result.correct) {
+                        setTotalScore(s => s + 10); setSessionScore(s => s + 10);
+                    } else {
+                        setRetryQueue(r => [...r, activeItem]);
+                    }
+                } catch (e) {
+                    alert("批改失敗: " + e.message);
+                } finally { setIsAnalyzing(false); }
+            };
+
+            return (
+                <div className="fixed inset-0 flex flex-col no-select overflow-hidden">
+                    <div className="bg-white border-b-2 border-red-100 p-4 flex justify-between items-center shadow-sm z-50">
+                        <div><h1 className="text-red-600 font-black text-lg">{lessonTitle || "聽寫練習"}</h1></div>
+                        <div className="text-right">
+                            <div className="text-2xl font-black text-orange-500">{totalScore} <span className="text-xs">分</span></div>
+                            <div className="text-[10px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded">🎮 獎勵：{Math.floor(totalScore/10*30/60)}分{(totalScore/10*30)%60}秒</div>
+                        </div>
+                    </div>
+
+                    {screen === 'menu' && (
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                            <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-orange-400 text-center">
+                                <h2 className="text-2xl font-black text-slate-700 mb-2">AI 聽寫大師 🎯</h2>
+                                <p className="text-slate-500 text-sm">挑戰聽寫，贏取遊戲時間獎勵！</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {[1, 2, 3, 4, 5, 6].map(n => (
+                                    <button key={n} onClick={() => startLesson(n)} className="bg-white border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 p-5 rounded-2xl font-bold text-slate-600 text-lg">第 {n} 課</button>
+                                ))}
+                            </div>
+                            <button onClick={() => startLesson('all')} className="w-full bg-slate-800 text-white p-6 rounded-3xl font-black text-xl shadow-xl">🏆 全範圍大會考</button>
+                        </div>
+                    )}
+
+                    {screen === 'quiz' && activeItem && (
+                        <div className="flex-1 flex flex-col p-4 overflow-hidden">
+                            <div className="flex justify-between items-center mb-4">
+                                <button onClick={() => setScreen('menu')} className="text-slate-400 font-bold text-sm bg-white px-4 py-2 border rounded-xl">離開</button>
+                                <button onClick={() => speak(activeItem.w)} className="bg-blue-500 text-white px-8 py-3 rounded-full font-black shadow-lg text-lg active:scale-95">🔈 再唸一次</button>
+                            </div>
+                            <div className="flex-1 overflow-auto bg-slate-300/50 rounded-[2rem] p-4 shadow-inner">
+                                <canvas ref={canvasRef} onPointerDown={(e) => handlePointer(e, 'start')} onPointerMove={(e) => handlePointer(e, 'move')} onPointerUp={(e) => handlePointer(e, 'end')} className="mx-auto block shadow-xl" />
+                                {isAnalyzing && (
+                                    <div className="fixed inset-0 bg-white/60 z-[100] flex flex-col items-center justify-center">
+                                        <div className="w-16 h-16 border-8 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                        <p className="text-red-600 font-black text-xl">AI 老師批改中...</p>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 mt-4 shrink-0">
+                                <button onClick={() => { strokesRef.current.pop(); setupCanvas(); }} className="bg-white text-slate-500 py-4 rounded-2xl font-bold shadow-md">← 回一步</button>
+                                <button onClick={() => { strokesRef.current = []; setupCanvas(); }} className="bg-white text-red-300 py-4 rounded-2xl font-bold shadow-md">全清</button>
+                                <button onClick={submit} className="bg-red-600 text-white py-4 rounded-2xl font-black text-xl shadow-lg active:translate-y-1">送出</button>
+                            </div>
+                        </div>
+                    )}
+
+                    {screen === 'lessonComplete' && (
+                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
+                            <div className="text-9xl mb-6">🏅</div>
+                            <h2 className="text-4xl font-black text-slate-800 mb-4">恭喜完成！</h2>
+                            <div className="bg-orange-50 p-8 rounded-[3rem] border-4 border-orange-100 w-full max-w-md mb-8">
+                                <p className="text-orange-500 font-black text-6xl mb-2">{sessionScore}</p>
+                                <p className="text-orange-300 font-bold">本次獲得積分</p>
+                            </div>
+                            <button onClick={() => setScreen('menu')} className="w-full max-w-sm bg-slate-800 text-white py-6 rounded-3xl font-black text-xl">回首頁</button>
+                        </div>
+                    )}
+
+                    {feedback && (
+                        <div className="fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-6 backdrop-blur-md">
+                            <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center shadow-2xl">
+                                <div className="text-9xl mb-6">{feedback.correct ? "🌟" : "💡"}</div>
+                                <h3 className={`text-4xl font-black mb-4 ${feedback.correct ? 'text-green-500' : 'text-red-500'}`}>{feedback.correct ? "太棒了！" : "差一點點！"}</h3>
+                                <p className="text-slate-500 text-lg mb-10 leading-relaxed font-medium bg-slate-50 p-6 rounded-2xl">{feedback.msg}</p>
+                                <button onClick={() => loadWord(queue, retryQueue)} className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-2xl shadow-xl active:scale-95">繼續</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
