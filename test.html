@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 聽寫大師 - 安全穩定版</title>
+    <title>AI 聽寫大師 - 2.5 Flash 專用版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
@@ -17,7 +17,7 @@
 
     <div class="w-full max-w-4xl bg-white p-4 rounded-2xl shadow-sm mb-4 flex justify-between items-center border-b-4 border-red-200">
         <div class="flex flex-col">
-            <span id="lesson-title" class="text-sm font-bold text-red-600">請選擇單元</span>
+            <span id="lesson-title" class="text-sm font-bold text-red-600">聽寫練習</span>
             <div class="flex items-center gap-2 mt-1">
                 <div class="w-20 h-1.5 bg-gray-100 rounded-full overflow-hidden">
                     <div id="progress-bar" class="h-full bg-red-500 transition-all duration-500" style="width: 0%"></div>
@@ -25,9 +25,7 @@
                 <span id="progress-text" class="text-[10px] text-gray-400 font-bold">0/0</span>
             </div>
         </div>
-        <div class="text-center">
-            <span id="game-time" class="text-sm font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg italic">獎勵 0 秒</span>
-        </div>
+        <div id="game-time" class="text-sm font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg italic">獎勵 0 秒</div>
         <div class="flex gap-2">
             <button onclick="resetKey()" class="text-[10px] bg-slate-100 text-slate-400 px-2 py-1 rounded">重設 Key</button>
             <button onclick="location.reload()" class="text-xs bg-red-50 text-red-600 px-3 py-1 rounded-lg font-bold">選單</button>
@@ -35,23 +33,23 @@
     </div>
 
     <div id="setup-screen" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-8">
-        <h2 class="text-2xl font-black text-slate-700 mb-6 text-center italic">AI 聽寫隨機考</h2>
+        <h2 class="text-2xl font-black text-slate-700 mb-6 text-center italic">AI 聽寫精熟考 (2.5 版)</h2>
         <div class="grid grid-cols-2 gap-4 mb-8">
-            <button onclick="initLesson(1)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 1 課</button>
-            <button onclick="initLesson(2)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 2 課</button>
-            <button onclick="initLesson(3)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 3 課</button>
-            <button onclick="initLesson(4)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 4 課</button>
-            <button onclick="initLesson(5)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 5 課</button>
-            <button onclick="initLesson(6)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100 transition-all">第 6 課</button>
+            <button onclick="initLesson(1)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 1 課</button>
+            <button onclick="initLesson(2)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 2 課</button>
+            <button onclick="initLesson(3)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 3 課</button>
+            <button onclick="initLesson(4)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 4 課</button>
+            <button onclick="initLesson(5)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 5 課</button>
+            <button onclick="initLesson(6)" class="p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">第 6 課</button>
         </div>
-        <button onclick="initLesson('all')" class="w-full p-6 bg-slate-800 text-white rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all">🏆 1-6 課全範圍隨機考</button>
+        <button onclick="initLesson('all')" class="w-full p-6 bg-slate-800 text-white rounded-3xl font-black text-xl shadow-lg active:scale-95 transition-all">🏆 1-6 課隨機考</button>
     </div>
 
     <div id="game-screen" class="w-full max-w-5xl hidden flex flex-col items-center">
         <div class="bg-white rounded-3xl shadow-xl p-6 w-full relative">
             <div class="flex justify-between items-center mb-6">
-                <span class="font-black text-slate-400">請依照唸出的題目寫字</span>
-                <button onclick="speak()" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow-lg active:scale-95 transition-all">🔈 唸題目</button>
+                <span class="font-black text-slate-400">寫出唸出的題目</span>
+                <button onclick="speak()" class="bg-red-500 text-white px-8 py-3 rounded-full font-bold shadow-lg">🔈 唸題目</button>
             </div>
 
             <div id="canvas-wrapper" class="canvas-container overflow-hidden mx-auto touch-none">
@@ -63,24 +61,23 @@
             </div>
 
             <div class="grid grid-cols-3 gap-4 mt-8">
-                <button onclick="undo()" class="py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl active:bg-slate-200">← 回一步</button>
+                <button onclick="undo()" class="py-4 bg-slate-100 text-slate-500 font-bold rounded-2xl">回一步</button>
                 <button onclick="clearCanvas()" class="py-4 bg-slate-50 text-slate-300 font-bold rounded-2xl">全清</button>
-                <button id="submit-btn" onclick="submit()" class="py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl active:bg-red-700 active:translate-y-1 transition-all">送出批改</button>
+                <button onclick="submit()" class="py-4 bg-red-600 text-white font-black rounded-2xl shadow-xl">送出</button>
             </div>
         </div>
     </div>
 
     <div id="result-modal" class="fixed inset-0 bg-slate-900/90 hidden z-[100] flex items-center justify-center p-6 backdrop-blur-sm">
-        <div class="bg-white rounded-[3rem] w-full max-w-sm p-10 text-center shadow-2xl scale-in">
+        <div class="bg-white rounded-[3rem] w-full max-w-sm p-10 text-center shadow-2xl">
             <div id="res-icon" class="text-9xl mb-4"></div>
             <h2 id="res-title" class="text-4xl font-black mb-4"></h2>
             <p id="res-msg" class="text-slate-500 mb-10 bg-slate-50 p-6 rounded-2xl italic leading-relaxed text-sm"></p>
-            <button onclick="nextWord()" class="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-2xl shadow-xl active:scale-95 transition-all">下一題</button>
+            <button onclick="nextWord()" class="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-2xl">下一題</button>
         </div>
     </div>
 
     <script>
-        // --- 安全 Key 管理 ---
         let API_KEY = localStorage.getItem('gemini_dictation_key') || "";
         function resetKey() { localStorage.removeItem('gemini_dictation_key'); location.reload(); }
 
@@ -99,12 +96,11 @@
 
         function initLesson(key) {
             if (!API_KEY) {
-                const input = prompt("請輸入您的 Gemini API Key：\n(此金鑰僅會儲存在您的瀏覽器中，不會公開上傳)");
+                const input = prompt("請輸入您的 Gemini API Key：");
                 if (!input) return;
                 API_KEY = input.trim();
                 localStorage.setItem('gemini_dictation_key', API_KEY);
             }
-
             let pool = key === 'all' ? Object.values(vocabData).flat() : vocabData[key];
             queue = [...pool].sort(() => Math.random() - 0.5);
             totalCount = queue.length;
@@ -154,7 +150,7 @@
             document.getElementById('result-modal').classList.add('hidden');
             if (queue.length === 0) {
                 if (retry.length > 0) { queue = [...retry].sort(() => Math.random()-0.5); retry = []; }
-                else { alert("🎉 太棒了！本單元全部完成！"); location.reload(); return; }
+                else { alert("🎉 本單元全部完成！"); location.reload(); return; }
             }
             current = queue.shift(); strokes = [];
             drawGrids(current.w); setTimeout(speak, 500);
@@ -176,11 +172,13 @@
             if (strokes.length < 1) return;
             document.getElementById('loading').classList.remove('hidden');
             const img = canvas.toDataURL('image/png').split(',')[1];
-            const prompt = `你是國小老師。檢查圖中「${current.w}」國字與注音「${current.b}」是否正確。請嚴格批改，回傳純 JSON: {"correct": true/false, "msg": "一句話回饋"}`;
+            const prompt = `你是國小老師。檢查圖中「${current.w}」國字與注音「${current.b}」是否正確。請回傳 JSON: {"correct": true/false, "msg": "回饋"}`;
             
             try {
-                // 使用 v1beta 通道搭配 gemini-1.5-flash
-                const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`, {
+                // 使用你實測成功的 2.5 Flash 路徑
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+                
+                const res = await fetch(url, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -200,20 +198,20 @@
                 if (result.correct) { 
                     score += 10; 
                     document.getElementById('res-icon').innerText = "🌟"; 
-                    document.getElementById('res-title').innerText = "完全正確！"; 
-                    document.getElementById('res-title').className = "text-4xl font-black mb-4 text-green-500";
+                    document.getElementById('res-title').innerText = "正確！"; 
+                    document.getElementById('res-title').style.color = "#22c55e";
                 } else { 
                     retry.push(current); 
                     document.getElementById('res-icon').innerText = "💡"; 
-                    document.getElementById('res-title').innerText = "加油再試試"; 
-                    document.getElementById('res-title').className = "text-4xl font-black mb-4 text-red-400";
+                    document.getElementById('res-title').innerText = "再檢查一下"; 
+                    document.getElementById('res-title').style.color = "#ef4444";
                 }
                 
                 document.getElementById('res-msg').innerText = result.msg;
                 document.getElementById('loading').classList.add('hidden');
                 document.getElementById('result-modal').classList.remove('hidden');
             } catch (e) {
-                alert("批改失敗！原因：" + e.message + "\n若 Key 錯誤請點擊「重設 Key」。");
+                alert("批改失敗：" + e.message);
                 document.getElementById('loading').classList.add('hidden');
             }
         }
