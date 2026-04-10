@@ -3,285 +3,319 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 聽寫精熟大師 - 穩定版</title>
+    <title>AI 聽寫隨機精熟大師 - 國小複習專用</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; touch-action: none; background-color: #f1f5f9; font-family: sans-serif; }
-        canvas { cursor: crosshair; touch-action: none; background-color: white; border-radius: 16px; }
-        .no-select { user-select: none; -webkit-user-select: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Noto Sans TC', sans-serif; 
+            background-color: #f8fafc; 
+            touch-action: none; 
+            overflow: hidden;
+            user-select: none;
+        }
+        .canvas-area {
+            position: relative;
+            background-color: white;
+            border: 4px solid #dc2626;
+            border-radius: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        .loader { border-top-color: #ef4444; animation: spinner 1s linear infinite; }
+        @keyframes spinner { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .lesson-card {
+            transition: all 0.2s;
+        }
+        .lesson-card:active { transform: scale(0.95); }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="min-h-screen flex flex-col items-center p-4">
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
-
-        const App = () => {
-            // --- 圈詞資料庫 ---
-            const vocabData = {
-                1: [{w:"音符",b:"ㄧㄣ ㄈㄨˊ"},{w:"坎坷",b:"ㄎㄢˇ ㄎㄜˇ"},{w:"澎湃",b:"ㄆㄥ ㄆㄞˋ"},{w:"無垠",b:"ㄨˊ ㄧㄣˊ"},{w:"丘陵",b:"ㄑㄧㄡ ㄌㄧㄥˊ"},{w:"瞭望",b:"ㄌㄧㄠˋ ㄨㄤˋ"},{w:"碧波",b:"ㄅㄧˋ ㄅㄛ"},{w:"盪漾",b:"協助"}],
-                2: [{w:"山巒",b:"ㄕㄢ ㄌㄨㄢˊ"},{w:"隧道",b:"ㄙㄨㄟˋ ㄉㄠˋ"},{w:"綻放",b:"ㄓㄢˋ ㄈㄤˋ"},{w:"震動",b:"ㄓㄣˋ ㄉㄨㄥˋ"},{w:"顫抖",b:"ㄓㄣˋ ㄉㄡˇ"},{w:"覆蓋",b:"ㄈㄨˋ ㄍㄞˋ"},{w:"低吟",b:"ㄉㄧ ㄧㄣˊ"}],
-                3: [{w:"寺廟",b:"ㄙˋ ㄇㄧㄠˋ"},{w:"點綴",b:"ㄉㄧㄢˇ ㄓㄨㄟˋ"},{w:"杜鵑",b:"杜 ㄐㄩㄢ"},{w:"宇宙",b:"ㄩˇ ㄓㄡˋ"},{w:"屬於",b:"ㄕㄨˇ ㄩˊ"},{w:"返璞歸真",b:"ㄈㄢˇ ㄆㄨˊ ㄍㄨㄟ ㄓㄣ"}],
-                4: [{w:"和藹",b:"ㄏㄜˊ ㄞˇ"},{w:"震撼",b:"ㄓㄣˋ ㄏㄢˋ"},{w:"尷尬",b:"ㄍㄢ ㄍㄚˋ"},{w:"恢復",b:"ㄏㄨㄟ ㄈㄨˋ"},{w:"奉獻",b:"ㄈㄥˋ ㄒㄧㄢˋ"}],
-                5: [{w:"囑咐",b:"ㄓㄨˇ ㄈㄨˋ"},{w:"富裕",b:"ㄈㄨˋ ㄩˋ"},{w:"領悟",b:"ㄌㄧㄥˇ ㄨˋ"},{w:"演講",b:"ㄧㄢˇ ㄐㄧㄤˇ"},{w:"障礙",b:"ㄓㄤˋ ㄞˋ"}],
-                6: [{w:"瀰漫",b:"ㄇㄧˊ ㄇㄢˋ"},{w:"暫時",b:"ㄗㄢˋ ㄕˊ"},{w:"煞有介事",b:"ㄕㄚˋ ㄧㄡˇ ㄐㄧㄝˋ ㄕˋ"},{w:"不置可否",b:"ㄅㄨˋ ㄓˋ ㄎㄜˇ ㄈㄡˇ"},{w:"聯絡簿",b:"ㄌㄧㄢˊ ㄌㄨㄛˋ ㄅㄨˋ"}]
-            };
-
-            const [screen, setScreen] = useState('menu');
-            const [totalScore, setTotalScore] = useState(0);
-            const [sessionScore, setSessionScore] = useState(0);
-            const [activeItem, setActiveItem] = useState(null);
-            const [queue, setQueue] = useState([]);
-            const [retryQueue, setRetryQueue] = useState([]);
-            const [lessonTitle, setLessonTitle] = useState('');
-            const [isAnalyzing, setIsAnalyzing] = useState(false);
-            const [feedback, setFeedback] = useState(null);
-
-            const canvasRef = useRef(null);
-            const strokesRef = useRef([]);
-            const isDrawing = useRef(false);
-            const currentPath = useRef([]);
-
-            // 尺寸設計：國字正方形，注音寬度增加
-            const CHAR_SIZE = 220; 
-            const BPO_WIDTH = 180; 
-            const BOX_GAP = 30;
-
-            useEffect(() => {
-                if (screen === 'quiz' && activeItem) {
-                    const timer = setTimeout(() => { setupCanvas(); }, 200);
-                    return () => clearTimeout(timer);
-                }
-            }, [activeItem, screen]);
-
-            const startLesson = (lessonKey) => {
-                let pool = lessonKey === 'all' ? Object.values(vocabData).flat() : [...vocabData[lessonKey]];
-                const shuffled = pool.sort(() => Math.random() - 0.5);
-                setQueue(shuffled);
-                setRetryQueue([]);
-                setSessionScore(0);
-                setLessonTitle(lessonKey === 'all' ? "全範圍隨機測試" : `第 ${lessonKey} 課練習`);
-                setScreen('quiz');
-                loadWord(shuffled, []);
-            };
-
-            const loadWord = (q, r) => {
-                let next = null;
-                let nQ = [...q], nR = [...r];
-                if (nQ.length > 0) {
-                    next = nQ.shift();
-                } else if (nR.length > 0) {
-                    nQ = [...nR].sort(() => Math.random() - 0.5);
-                    nR = [];
-                    next = nQ.shift();
-                    setFeedback({ correct: false, msg: "準備進入複習階段囉！" });
-                } else {
-                    setScreen('lessonComplete');
-                    return;
-                }
-                setQueue(nQ); setRetryQueue(nR);
-                setActiveItem(next); setFeedback(null);
-                strokesRef.current = [];
-                speak(next.w);
-            };
-
-            const speak = (text) => {
-                if (!text) return;
-                window.speechSynthesis.cancel();
-                const msg = new SpeechSynthesisUtterance(`請寫出：${text}`);
-                msg.lang = 'zh-TW';
-                msg.rate = 0.8;
-                window.speechSynthesis.speak(msg);
-            };
-
-            const setupCanvas = () => {
-                const canvas = canvasRef.current;
-                if (!canvas || !activeItem) return;
-                const ctx = canvas.getContext('2d');
-                const totalWidth = 20 + CHAR_SIZE + 20 + BPO_WIDTH + 20;
-                const charLen = activeItem.w.length;
-                const totalHeight = (CHAR_SIZE + BOX_GAP) * charLen + BOX_GAP;
-                
-                canvas.width = totalWidth * 2;
-                canvas.height = totalHeight * 2;
-                canvas.style.width = `${totalWidth}px`;
-                canvas.style.height = `${totalHeight}px`;
-                ctx.scale(2, 2);
-                drawUI(ctx, totalWidth, charLen);
-            };
-
-            const drawUI = (ctx, width, charLen) => {
-                ctx.clearRect(0, 0, width, 5000);
-                for (let i = 0; i < charLen; i++) {
-                    const y = BOX_GAP + i * (CHAR_SIZE + BOX_GAP);
-                    const bpoX = 20 + CHAR_SIZE + 20;
-
-                    ctx.strokeStyle = "#fca5a5"; ctx.lineWidth = 2;
-                    ctx.strokeRect(20, y, CHAR_SIZE, CHAR_SIZE);
-                    ctx.setLineDash([5, 5]);
-                    ctx.beginPath();
-                    ctx.moveTo(20 + CHAR_SIZE/2, y); ctx.lineTo(20 + CHAR_SIZE/2, y + CHAR_SIZE);
-                    ctx.moveTo(20, y + CHAR_SIZE/2); ctx.lineTo(20 + CHAR_SIZE, y + CHAR_SIZE/2);
-                    ctx.stroke(); ctx.setLineDash([]);
-
-                    ctx.strokeStyle = "#93c5fd";
-                    ctx.strokeRect(bpoX, y, BPO_WIDTH, CHAR_SIZE);
-                    ctx.fillStyle = "#94a3b8";
-                    ctx.font = "bold 14px sans-serif";
-                    ctx.fillText(`國字 ${i+1}`, 20, y - 10);
-                    ctx.fillText(`注音區`, bpoX, y - 10);
-                }
-                ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 6;
-                strokesRef.current.forEach(path => {
-                    if (path.length < 1) return;
-                    ctx.beginPath(); ctx.moveTo(path[0].x, path[0].y);
-                    path.forEach(p => ctx.lineTo(p.x, p.y)); ctx.stroke();
-                });
-            };
-
-            const handlePointer = (e, type) => {
-                const canvas = canvasRef.current; if (!canvas) return;
-                const rect = canvas.getBoundingClientRect();
-                const touch = e.touches ? e.touches[0] : e;
-                const x = touch.clientX - rect.left;
-                const y = touch.clientY - rect.top;
-
-                if (type === 'start') {
-                    isDrawing.current = true;
-                    currentPath.current = [{ x, y }];
-                } else if (type === 'move' && isDrawing.current) {
-                    if (e.cancelable) e.preventDefault();
-                    currentPath.current.push({ x, y });
-                    const ctx = canvas.getContext('2d');
-                    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 6;
-                    ctx.beginPath();
-                    const last = currentPath.current[currentPath.current.length - 2];
-                    ctx.moveTo(last.x, last.y); ctx.lineTo(x, y); ctx.stroke();
-                } else if (type === 'end') {
-                    if (isDrawing.current) strokesRef.current.push([...currentPath.current]);
-                    isDrawing.current = false;
-                }
-            };
-
-            const submit = async () => {
-                if (strokesRef.current.length < 2) return;
-                setIsAnalyzing(true);
-                const imgData = canvasRef.current.toDataURL('image/png').split(',')[1];
-                const prompt = `這是一個國小聽寫測驗。題目是「${activeItem.w}」，注音是「${activeItem.b}」。請檢查圖片中正方形內的國字與長方形內的注音。請嚴格批改，務必回傳純 JSON 格式：{"correct": true, "msg": "回饋一句話"}`;
-
-                // --- ⚠️ 在此輸入您的 API KEY ---
-                const API_KEY = "AIzaSyApo0XAX223pk2P0AfZYrgrOvu2PK1JQP4";
-
-                try {
-                    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            contents: [{
-                                parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: imgData } }]
-                            }]
-                        })
-                    });
-
-                    const data = await response.json();
-                    if (data.error) throw new Error(data.error.message);
-
-                    const rawText = data.candidates[0].content.parts[0].text;
-                    const cleanJson = rawText.replace(/```json|```/g, "").trim();
-                    const result = JSON.parse(cleanJson);
-
-                    setFeedback(result);
-                    if (result.correct) {
-                        setTotalScore(s => s + 10); setSessionScore(s => s + 10);
-                    } else {
-                        setRetryQueue(r => [...r, activeItem]);
-                    }
-                } catch (e) {
-                    alert("批改失敗: " + e.message);
-                } finally { setIsAnalyzing(false); }
-            };
-
-            return (
-                <div className="fixed inset-0 flex flex-col no-select overflow-hidden">
-                    <div className="bg-white border-b-2 border-red-100 p-4 flex justify-between items-center shadow-sm z-50">
-                        <div><h1 className="text-red-600 font-black text-lg">{lessonTitle || "聽寫練習"}</h1></div>
-                        <div className="text-right">
-                            <div className="text-2xl font-black text-orange-500">{totalScore} <span className="text-xs">分</span></div>
-                            <div className="text-[10px] text-blue-500 font-bold bg-blue-50 px-2 py-0.5 rounded">🎮 獎勵：{Math.floor(totalScore/10*30/60)}分{(totalScore/10*30)%60}秒</div>
-                        </div>
-                    </div>
-
-                    {screen === 'menu' && (
-                        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                            <div className="bg-white p-6 rounded-3xl shadow-xl border-t-8 border-orange-400 text-center">
-                                <h2 className="text-2xl font-black text-slate-700 mb-2">AI 聽寫大師 🎯</h2>
-                                <p className="text-slate-500 text-sm">挑戰聽寫，贏取遊戲時間獎勵！</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                {[1, 2, 3, 4, 5, 6].map(n => (
-                                    <button key={n} onClick={() => startLesson(n)} className="bg-white border-b-4 border-slate-300 active:border-b-0 active:translate-y-1 p-5 rounded-2xl font-bold text-slate-600 text-lg">第 {n} 課</button>
-                                ))}
-                            </div>
-                            <button onClick={() => startLesson('all')} className="w-full bg-slate-800 text-white p-6 rounded-3xl font-black text-xl shadow-xl">🏆 全範圍大會考</button>
-                        </div>
-                    )}
-
-                    {screen === 'quiz' && activeItem && (
-                        <div className="flex-1 flex flex-col p-4 overflow-hidden">
-                            <div className="flex justify-between items-center mb-4">
-                                <button onClick={() => setScreen('menu')} className="text-slate-400 font-bold text-sm bg-white px-4 py-2 border rounded-xl">離開</button>
-                                <button onClick={() => speak(activeItem.w)} className="bg-blue-500 text-white px-8 py-3 rounded-full font-black shadow-lg text-lg active:scale-95">🔈 再唸一次</button>
-                            </div>
-                            <div className="flex-1 overflow-auto bg-slate-300/50 rounded-[2rem] p-4 shadow-inner">
-                                <canvas ref={canvasRef} onPointerDown={(e) => handlePointer(e, 'start')} onPointerMove={(e) => handlePointer(e, 'move')} onPointerUp={(e) => handlePointer(e, 'end')} className="mx-auto block shadow-xl" />
-                                {isAnalyzing && (
-                                    <div className="fixed inset-0 bg-white/60 z-[100] flex flex-col items-center justify-center">
-                                        <div className="w-16 h-16 border-8 border-red-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                        <p className="text-red-600 font-black text-xl">AI 老師批改中...</p>
-                                    </div>
-                                )}
-                            </div>
-                            <div className="grid grid-cols-3 gap-4 mt-4 shrink-0">
-                                <button onClick={() => { strokesRef.current.pop(); setupCanvas(); }} className="bg-white text-slate-500 py-4 rounded-2xl font-bold shadow-md">← 回一步</button>
-                                <button onClick={() => { strokesRef.current = []; setupCanvas(); }} className="bg-white text-red-300 py-4 rounded-2xl font-bold shadow-md">全清</button>
-                                <button onClick={submit} className="bg-red-600 text-white py-4 rounded-2xl font-black text-xl shadow-lg active:translate-y-1">送出</button>
-                            </div>
-                        </div>
-                    )}
-
-                    {screen === 'lessonComplete' && (
-                        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-white">
-                            <div className="text-9xl mb-6">🏅</div>
-                            <h2 className="text-4xl font-black text-slate-800 mb-4">恭喜完成！</h2>
-                            <div className="bg-orange-50 p-8 rounded-[3rem] border-4 border-orange-100 w-full max-w-md mb-8">
-                                <p className="text-orange-500 font-black text-6xl mb-2">{sessionScore}</p>
-                                <p className="text-orange-300 font-bold">本次獲得積分</p>
-                            </div>
-                            <button onClick={() => setScreen('menu')} className="w-full max-w-sm bg-slate-800 text-white py-6 rounded-3xl font-black text-xl">回首頁</button>
-                        </div>
-                    )}
-
-                    {feedback && (
-                        <div className="fixed inset-0 bg-slate-900/80 z-[200] flex items-center justify-center p-6 backdrop-blur-md">
-                            <div className="bg-white w-full max-w-md rounded-[3rem] p-10 text-center shadow-2xl">
-                                <div className="text-9xl mb-6">{feedback.correct ? "🌟" : "💡"}</div>
-                                <h3 className={`text-4xl font-black mb-4 ${feedback.correct ? 'text-green-500' : 'text-red-500'}`}>{feedback.correct ? "太棒了！" : "差一點點！"}</h3>
-                                <p className="text-slate-500 text-lg mb-10 leading-relaxed font-medium bg-slate-50 p-6 rounded-2xl">{feedback.msg}</p>
-                                <button onClick={() => loadWord(queue, retryQueue)} className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-2xl shadow-xl active:scale-95">繼續</button>
-                            </div>
-                        </div>
-                    )}
+    <!-- 頂部資訊列 -->
+    <div class="w-full max-w-4xl bg-white p-4 rounded-2xl shadow-sm mb-4 flex justify-between items-center border-b-4 border-red-200">
+        <div class="flex flex-col">
+            <span id="lesson-title" class="text-sm font-bold text-red-600 uppercase tracking-wider">請選擇單元</span>
+            <div class="flex items-center gap-2 mt-1">
+                <div class="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div id="progress-bar" class="h-full bg-red-500 transition-all duration-500" style="width: 0%"></div>
                 </div>
-            );
+                <span id="progress-text" class="text-[10px] text-gray-400 font-bold">0/0</span>
+            </div>
+        </div>
+        <div class="text-center">
+            <span class="text-xs text-gray-400 block font-bold">累積獎勵時間</span>
+            <span id="game-time" class="text-xl font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">0 秒</span>
+        </div>
+        <div class="text-right">
+            <span class="text-xs text-gray-400 block font-bold">目前積分</span>
+            <span id="score" class="text-2xl font-black text-orange-500">0</span>
+        </div>
+    </div>
+
+    <!-- 1. 課程選擇介面 -->
+    <div id="setup-screen" class="w-full max-w-2xl bg-white rounded-3xl shadow-xl p-8 overflow-y-auto max-h-[80vh]">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 text-center italic text-red-600">AI 聽寫小老師：精熟隨機考</h2>
+        <div class="grid grid-cols-2 gap-4 mb-8">
+            <button onclick="initLesson(1)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L1 鵝鑾鼻</button>
+            <button onclick="initLesson(2)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L2 聽一聽</button>
+            <button onclick="initLesson(3)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L3 東方之最</button>
+            <button onclick="initLesson(4)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L4 滿詠萱</button>
+            <button onclick="initLesson(5)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L5 派去非洲</button>
+            <button onclick="initLesson(6)" class="lesson-card p-4 bg-red-50 border-2 border-red-100 text-red-700 rounded-2xl font-bold hover:bg-red-100">L6 幸福味道</button>
+        </div>
+        <button onclick="initLesson('final')" class="w-full p-6 bg-gradient-to-r from-red-600 to-orange-500 text-white rounded-3xl font-black text-xl shadow-lg hover:from-red-700 transition-all flex items-center justify-center gap-3">
+            <span>🏆 1-6 課全範圍大會考 (隨機抽題)</span>
+        </button>
+    </div>
+
+    <!-- 2. 聽寫作答介面 -->
+    <div id="game-screen" class="w-full max-w-5xl hidden flex flex-col items-center">
+        <div class="bg-white rounded-3xl shadow-xl p-6 w-full mb-4">
+            <div class="flex justify-between items-center mb-6">
+                <div class="flex items-center gap-2">
+                    <span class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></span>
+                    <span class="font-bold text-gray-600">學生作答區</span>
+                </div>
+                <button onclick="speak()" class="flex items-center gap-2 bg-red-500 text-white px-8 py-3 rounded-2xl font-bold shadow-lg active:scale-95 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                    唸題目
+                </button>
+            </div>
+
+            <div id="canvas-container" class="canvas-area overflow-hidden mx-auto">
+                <canvas id="main-canvas"></canvas>
+                <div id="loading-overlay" class="absolute inset-0 bg-white/90 z-30 hidden flex flex-col items-center justify-center">
+                    <div class="loader rounded-full border-4 border-gray-200 h-16 w-16 mb-4"></div>
+                    <p class="text-red-600 font-bold text-xl">AI 老師正在閱卷...</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mt-8">
+                <button onclick="clearCanvas()" class="py-4 bg-gray-100 text-gray-500 font-bold rounded-2xl active:bg-gray-200">清除重寫</button>
+                <button id="submit-btn" onclick="submitWriting()" class="py-4 bg-red-600 text-white font-bold rounded-2xl shadow-xl active:bg-red-700">送出批改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 結果 Modal -->
+    <div id="result-modal" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center p-6">
+        <div class="bg-white rounded-[2.5rem] w-full max-w-sm p-8 text-center shadow-2xl">
+            <div id="res-icon" class="text-8xl mb-4"></div>
+            <h2 id="res-title" class="text-3xl font-black mb-2"></h2>
+            <div id="res-feedback" class="text-gray-600 mb-8 bg-red-50 p-5 rounded-2xl text-sm leading-relaxed min-h-[60px]"></div>
+            <button onclick="nextWord()" class="w-full bg-blue-600 text-white font-bold py-5 rounded-2xl text-xl shadow-xl active:scale-95">
+                繼續下一題
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; 
+        const vocabDB = {
+            1: [{w:"音符",b:"ㄧㄣ ㄈㄨˊ"},{w:"坎坷",b:"ㄎㄢˇ ㄎㄜˇ"},{w:"澎湃",b:"ㄆㄥ ㄆㄞˋ"},{w:"無垠",b:"ㄨˊ ㄧㄣˊ"},{w:"丘陵",b:"ㄑㄧㄡ ㄌㄧㄥˊ"},{w:"瞭望",b:"ㄌㄧㄠˋ ㄨㄤˋ"},{w:"碧波",b:"ㄅㄧˋ ㄅㄛ"},{w:"盪漾",b:"ㄉㄤˋ ㄧㄤˋ"},{w:"變遷",b:"ㄅㄧㄢˋ ㄑㄧㄢ"}],
+            2: [{w:"山巒",b:"ㄕㄢ ㄌㄨㄢˊ"},{w:"隧道",b:"ㄙㄨㄟˋ ㄉㄠˋ"},{w:"綻放",b:"ㄓㄢˋ ㄈㄤˋ"},{w:"震動",b:"ㄓㄣˋ ㄉㄨㄥˋ"},{w:"顫抖",b:"ㄓㄢˋ ㄉㄡˇ"},{w:"覆蓋",b:"ㄈㄨˋ ㄍㄞˋ"},{w:"低吟",b:"ㄉㄧ ㄧㄣˊ"}],
+            3: [{w:"寺廟",b:"ㄙˋ ㄇㄧㄠˋ"},{w:"點綴",b:"ㄉㄧㄢˇ ㄓㄨㄟˋ"},{w:"杜鵑",b:"ㄉㄨˋ ㄐㄩㄢ"},{w:"宇宙",b:"ㄩˇ ㄓㄡˋ"},{w:"簽證",b:"ㄑㄧㄢ ㄓㄥˋ"},{w:"屬於",b:"ㄕㄨˇ ㄩˊ"},{w:"返璞歸真",b:"ㄈㄢˇ ㄆㄨˊ ㄍㄨㄟ ㄓㄣ"}],
+            4: [{w:"採訪",b:"ㄘㄞˇ ㄈㄤˇ"},{w:"和藹",b:"ㄏㄜˊ ㄞˇ"},{w:"震撼",b:"ㄓㄣˋ ㄏㄢˋ"},{w:"尷尬",b:"ㄍㄢ ㄍㄚˋ"},{w:"恢復",b:"ㄏㄨㄟ ㄈㄨˋ"},{w:"奉獻",b:"ㄈㄥˋ ㄒㄧㄢˋ"}],
+            5: [{w:"囑咐",b:"ㄓㄨˇ ㄈㄨˋ"},{w:"富裕",b:"ㄈㄨˋ ㄩˋ"},{w:"領悟",b:"ㄌㄧㄥˇ ㄨˋ"},{w:"演講",b:"ㄧㄢˇ ㄐㄧㄤˇ"},{w:"障礙",b:"ㄓㄤˋ ㄞˋ"},{w:"給予",b:"ㄐㄧˇ ㄩˇ"}],
+            6: [{w:"瀰漫",b:"ㄇㄧˊ ㄇㄢˋ"},{w:"暫時",b:"ㄗㄢˋ ㄕˊ"},{w:"煞有介事",b:"ㄕㄚˋ ㄧㄡˇ ㄐㄧㄝˋ ㄕˋ"},{w:"不置可否",b:"ㄅㄨˋ ㄓˋ ㄎㄜˇ ㄈㄡˇ"},{w:"聯絡簿",b:"ㄌㄧㄢˊ ㄌㄨㄛˋ ㄅㄨˋ"}]
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        let currentQueue = [];
+        let retryQueue = [];
+        let completedCount = 0;
+        let totalWordsInSession = 0;
+        let currentItem = null;
+        let score = 0;
+        let canvas, ctx, isDrawing = false;
+
+        // 格子尺寸
+        const CHAR_BOX = 140; 
+        const BPO_BOX = 60;
+        const PAD = 25;
+
+        function initLesson(lessonKey) {
+            // 隨機選題邏輯
+            let pool = [];
+            if(lessonKey === 'final') {
+                pool = Object.values(vocabDB).flat();
+                document.getElementById('lesson-title').innerText = "1-6 課隨機大會考";
+            } else {
+                pool = [...vocabDB[lessonKey]];
+                document.getElementById('lesson-title').innerText = `第 ${lessonKey} 課精熟練習`;
+            }
+            
+            // 洗牌隨機順序
+            currentQueue = pool.sort(() => Math.random() - 0.5);
+            retryQueue = [];
+            completedCount = 0;
+            totalWordsInSession = currentQueue.length;
+            
+            document.getElementById('setup-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            
+            canvas = document.getElementById('main-canvas');
+            ctx = canvas.getContext('2d');
+            
+            updateProgress();
+            nextWord();
+        }
+
+        function drawGrids(word) {
+            const len = word.length;
+            const unitW = CHAR_BOX + BPO_BOX;
+            const totalW = (unitW * len) + (PAD * (len + 1));
+            const totalH = CHAR_BOX + (PAD * 2);
+            
+            canvas.width = totalW * 2;
+            canvas.height = totalH * 2;
+            canvas.style.width = totalW + "px";
+            canvas.style.height = totalH + "px";
+            
+            ctx.scale(2, 2);
+            ctx.clearRect(0, 0, totalW, totalH);
+            
+            for (let i = 0; i < len; i++) {
+                const x = PAD + i * (unitW + PAD);
+                const y = PAD;
+
+                // 國字格
+                ctx.strokeStyle = "#f87171";
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x, y, CHAR_BOX, CHAR_BOX);
+                
+                // 九宮格線
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(x + CHAR_BOX/2, y); ctx.lineTo(x + CHAR_BOX/2, y + CHAR_BOX);
+                ctx.moveTo(x, y + CHAR_BOX/2); ctx.lineTo(x + CHAR_BOX, y + CHAR_BOX/2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // 注音格
+                const bx = x + CHAR_BOX;
+                ctx.strokeStyle = "#60a5fa";
+                ctx.strokeRect(bx, y, BPO_BOX, CHAR_BOX);
+                
+                // 注音輔助線
+                ctx.setLineDash([3, 3]);
+                ctx.beginPath();
+                ctx.moveTo(bx, y + CHAR_BOX/3); ctx.lineTo(bx + BPO_BOX, y + CHAR_BOX/3);
+                ctx.moveTo(bx, y + (CHAR_BOX/3)*2); ctx.lineTo(bx + BPO_BOX, y + (CHAR_BOX/3)*2);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+            setupInk();
+        }
+
+        function setupInk() {
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = '#0f172a';
+
+            const getPos = (e) => {
+                const r = canvas.getBoundingClientRect();
+                const cx = e.touches ? e.touches[0].clientX : e.clientX;
+                const cy = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: cx - r.left, y: cy - r.top };
+            };
+
+            canvas.onmousedown = (e) => { isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+            canvas.onmousemove = (e) => { if(!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+            window.onmouseup = () => isDrawing = false;
+
+            canvas.ontouchstart = (e) => { e.preventDefault(); isDrawing = true; ctx.beginPath(); const p = getPos(e); ctx.moveTo(p.x, p.y); };
+            canvas.ontouchmove = (e) => { e.preventDefault(); if(!isDrawing) return; const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); };
+            canvas.ontouchend = () => isDrawing = false;
+        }
+
+        function speak() {
+            if(!currentItem) return;
+            const u = new SpeechSynthesisUtterance(`${currentItem.w}。注音是：${currentItem.b}`);
+            u.lang = 'zh-TW';
+            u.rate = 0.75;
+            window.speechSynthesis.speak(u);
+        }
+
+        function updateProgress() {
+            const total = totalWordsInSession;
+            const done = completedCount;
+            const percent = (done / total) * 100;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+            document.getElementById('progress-text').innerText = `${done}/${total}`;
+        }
+
+        function nextWord() {
+            document.getElementById('result-modal').classList.add('hidden');
+            
+            if (currentQueue.length === 0) {
+                if (retryQueue.length > 0) {
+                    currentQueue = [...retryQueue].sort(() => Math.random() - 0.5);
+                    retryQueue = [];
+                } else {
+                    alert("這單元的生字你都精通了！獎勵時間已入帳。");
+                    location.reload();
+                    return;
+                }
+            }
+
+            currentItem = currentQueue.shift();
+            drawGrids(currentItem.w);
+            setTimeout(speak, 500);
+        }
+
+        function clearCanvas() { drawGrids(currentItem.w); }
+
+        async function submitWriting() {
+            document.getElementById('loading-overlay').classList.remove('hidden');
+            const dataUrl = canvas.toDataURL('image/png').split(',')[1];
+            
+            const prompt = `你是國小老師。圖中有 ${currentItem.w.length} 組格子。
+            紅色大格是國字，藍色窄格是注音。
+            目標：國字「${currentItem.w}」，注音「${currentItem.b}」。
+            請檢查：
+            1. 國字每一劃是否正確，結構是否端正。
+            2. 注音符號是否正確並寫在藍色格子內。
+            請回傳 JSON: {"correct": true/false, "msg": "鼓勵或具體指出寫錯的地方"}`;
+
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: "image/png", data: dataUrl } }] }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    })
+                });
+                
+                const data = await response.json();
+                const res = JSON.parse(data.candidates[0].content.parts[0].text);
+                
+                if (res.correct) {
+                    score += 10;
+                    completedCount++;
+                    document.getElementById('res-icon').innerText = "🏅";
+                    document.getElementById('res-title').innerText = "寫得真漂亮！";
+                } else {
+                    retryQueue.push(currentItem);
+                    document.getElementById('res-icon').innerText = "💡";
+                    document.getElementById('res-title').innerText = "再檢查一下";
+                }
+                
+                document.getElementById('res-feedback').innerText = res.msg;
+                document.getElementById('score').innerText = score;
+                const totalSec = (score / 10) * 30;
+                document.getElementById('game-time').innerText = `${totalSec} 秒`;
+                
+                updateProgress();
+                document.getElementById('loading-overlay').classList.add('hidden');
+                document.getElementById('result-modal').classList.remove('hidden');
+            } catch (e) {
+                alert("AI 老師斷網了，請重試");
+                document.getElementById('loading-overlay').classList.add('hidden');
+            }
+        }
     </script>
 </body>
 </html>
